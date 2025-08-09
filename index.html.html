@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Snake (Nokia-style)</title>
+<style>
+  :root {
+    --bg: #0b0f10;
+    --grid: #0f1518;
+    --snake: #7CFC00; /* lawn green, retro vibe */
+    --snake-head: #B7FF4A;
+    --food: #ff3b30;
+    --text: #d7e1e8;
+    --accent: #3aa3ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    background: radial-gradient(circle at 30% 10%, #0e1416, var(--bg));
+    color: var(--text);
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+  }
+  .wrap {
+    width: min(96vmin, 720px);
+    display: grid;
+    gap: 12px;
+  }
+  header {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 10px;
+    align-items: center;
+  }
+  h1 {
+    margin: 0;
+    font-size: clamp(16px, 2.5vmin, 22px);
+    letter-spacing: 0.04em;
+    opacity: .9;
+  }
+  .stats {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .badge {
+    background: #10191d;
+    border: 1px solid #1b2a31;
+    border-radius: 10px;
+    padding: 6px 10px;
+  }
+  canvas {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    image-rendering: pixelated;
+    background:
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / calc(100% / 20) 100%,
+      linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 100% calc(100% / 20),
+      #071013;
+    border-radius: 12px;
+    border: 1px solid #142229;
+    box-shadow: 0 1px 0 #142229 inset, 0 12px 30px rgba(0,0,0,.35);
+    touch-action: none; /* allow custom gestures */
+  }
+  .controls {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    user-select: none;
+  }
+  .controls button {
+    padding: 14px 10px;
+    background: #0e171b;
+    color: var(--text);
+    border: 1px solid #19313b;
+    border-radius: 10px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: transform .08s ease, background .2s ease, border-color .2s ease;
+    touch-action: manipulation;
+  }
+  .controls button:active {
+    transform: translateY(1px);
+  }
+  .controls .wide { grid-column: span 3; }
+  footer {
+    opacity: .7;
+    font-size: 12px;
+    text-align: center;
+  }
+  .hint { opacity: .8; font-size: 12px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Snake — Nokia style</h1>
+      <div class="stats">
+        <div class="badge">Score: <span id="score">0</span></div>
+        <div class="badge">Best: <span id="best">0</span></div>
+      </div>
+      <div>
+        <button id="pauseBtn" class="badge" title="P">Pause</button>
+      </div>
+    </header>
+
+    <canvas id="board" width="400" height="400" aria-label="Snake game board"></canvas>
+
+    <div class="controls">
+      <button id="up">▲</button>
+      <div class="hint" style="display:grid; place-items:center;">Swipe / Keys</div>
+      <button id="right">►</button>
+      <button id="left">◄</button>
+      <button id="down">▼</button>
+      <button id="restart" class="wide">Restart</button>
+    </div>
+
+    <footer>Controls: Arrow keys / WASD · P to pause · Classic wall collision · No wrap</footer>
+  </div>
+
+<script>
+(() => {
+  // --- Config ---
+  const GRID = 20;           // 20x20 grid
+  const SPEED_START = 140;   // ms per frame
+  const SPEED_MIN = 70;      // minimum delay
+  const SPEED_STEP = 1.5;    // decrease in ms per apple (small accel)
+  const CELL = 20;           // px per cell in internal canvas units
+  const BOARD_PX = GRID * CELL;
+
+  // --- State ---
+  const canvas = document.getElementById('board');
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.height = BOARD_PX;
+
+  const scoreEl = document.getElementById('score');
+  const bestEl = document.getElementById('best');
+  const pauseBtn = document.getElementById('pauseBtn');
+
+  let best = Number(localStorage.getItem('snake_best') || 0);
+  bestEl.textContent = best;
+
+  let state;
+
+  function init() {
+    state = {
+      snake: [{x:10, y:10}, {x:9, y:10}, {x:8, y:10}],
+      dir: {x:1, y:0},
+      nextDir: {x:1, y:0},
+      food: spawnFood([{x:10, y:10},{x:9,y:10},{x:8,y:10}]),
+      score: 0,
+      paused: false,
+      over: false,
+      delay: SPEED_START,
+      lastTick: 0
+    };
+    scoreEl.textContent = 0;
+    draw();
+  }
+
+  function rngInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+  function spawnFood(blocked) {
+    const blockedSet = new Set(blocked.map(p => p.x + ',' + p.y));
+    let x, y;
+    do {
+      x = rngInt(0, GRID-1);
+      y = rngInt(0, GRID-1);
+    } while (blockedSet.has(x + ',' + y));
+    return {x, y};
+  }
+
+  function setDir(nx, ny) {
+    // Prevent 180-degree reversal
+    if ((nx === -state.dir.x && ny === -state.dir.y) || (nx === state.dir.x && ny === state.dir.y)) return;
+    state.nextDir = {x:nx, y:ny};
+  }
+
+  // --- Input: keyboard ---
+  window.addEventListener('keydown', (e) => {
+    switch (e.key) {
+      case 'ArrowUp': case 'w': case 'W': setDir(0,-1); break;
+      case 'ArrowDown': case 's': case 'S': setDir(0, 1); break;
+      case 'ArrowLeft': case 'a': case 'A': setDir(-1,0); break;
+      case 'ArrowRight': case 'd': case 'D': setDir(1, 0); break;
+      case 'p': case 'P': togglePause(); break;
+      case ' ': if (state.over) init(); break;
+    }
+  }, {passive: true});
+
+  // --- Input: on-screen buttons ---
+  document.getElementById('up').onclick = () => setDir(0,-1);
+  document.getElementById('down').onclick = () => setDir(0,1);
+  document.getElementById('left').onclick = () => setDir(-1,0);
+  document.getElementById('right').onclick = () => setDir(1,0);
+  document.getElementById('restart').onclick = () => init();
+  pauseBtn.onclick = () => togglePause();
+
+  // --- Input: touch (swipe) ---
+  let touchStart = null;
+  canvas.addEventListener('touchstart', (e) => {
+    if (e.touches.length) touchStart = {x: e.touches[0].clientX, y: e.touches[0].clientY, t: performance.now()};
+  }, {passive: true});
+  canvas.addEventListener('touchend', (e) => {
+    if (!touchStart) return;
+    const t = performance.now() - touchStart.t;
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - touchStart.x;
+    const dy = touch.clientY - touchStart.y;
+    const adx = Math.abs(dx), ady = Math.abs(dy);
+    // simple swipe detection
+    if (t < 500 && Math.max(adx, ady) > 20) {
+      if (adx > ady) setDir(Math.sign(dx), 0);
+      else setDir(0, Math.sign(dy));
+    }
+    touchStart = null;
+  }, {passive: true});
+
+  function togglePause() {
+    if (state.over) return;
+    state.paused = !state.paused;
+    pauseBtn.textContent = state.paused ? 'Resume' : 'Pause';
+  }
+
+  // --- Game loop ---
+  function loop(ts) {
+    requestAnimationFrame(loop);
+    if (state.paused || state.over) return;
+
+    if (ts - state.lastTick >= state.delay) {
+      tick();
+      state.lastTick = ts;
+    }
+  }
+
+  function tick() {
+    // Move snake
+    state.dir = state.nextDir;
+    const head = state.snake[0];
+    const nx = head.x + state.dir.x;
+    const ny = head.y + state.dir.y;
+
+    // wall collision (classic)
+    if (nx < 0 || ny < 0 || nx >= GRID || ny >= GRID) {
+      return gameOver();
+    }
+
+    // self collision
+    for (let i = 0; i < state.snake.length; i++) {
+      if (state.snake[i].x === nx && state.snake[i].y === ny) {
+        return gameOver();
+      }
+    }
+
+    // move body
+    state.snake.unshift({x:nx, y:ny});
+
+    // eat food?
+    if (nx === state.food.x && ny === state.food.y) {
+      state.score += 1;
+      scoreEl.textContent = state.score;
+      state.delay = Math.max(SPEED_MIN, state.delay - SPEED_STEP);
+      state.food = spawnFood(state.snake);
+    } else {
+      state.snake.pop();
+    }
+
+    draw();
+  }
+
+  function gameOver() {
+    state.over = true;
+    best = Math.max(best, state.score);
+    localStorage.setItem('snake_best', String(best));
+    bestEl.textContent = best;
+    draw(true);
+  }
+
+  // --- Render ---
+  function draw(over = false) {
+    // clear
+    ctx.clearRect(0,0,BOARD_PX,BOARD_PX);
+
+    // draw food
+    drawCell(state.food.x, state.food.y, 'food');
+
+    // draw snake
+    for (let i = state.snake.length - 1; i >= 0; i--) {
+      const part = state.snake[i];
+      if (i === 0) drawCell(part.x, part.y, 'head');
+      else drawCell(part.x, part.y, 'body');
+    }
+
+    if (over) {
+      overlayText('Game Over', 'Press Restart or Space');
+    } else if (state.paused) {
+      overlayText('Paused', 'Press Resume / P');
+    }
+  }
+
+  function drawCell(x, y, type) {
+    const px = x * CELL, py = y * CELL;
+    ctx.save();
+    if (type === 'food') {
+      ctx.fillStyle = getCSS('--food');
+      roundedRect(ctx, px+3, py+3, CELL-6, CELL-6, 3);
+      ctx.fill();
+    } else if (type === 'head') {
+      const grad = ctx.createLinearGradient(px, py, px+CELL, py+CELL);
+      grad.addColorStop(0, getCSS('--snake-head'));
+      grad.addColorStop(1, getCSS('--snake'));
+      ctx.fillStyle = grad;
+      roundedRect(ctx, px+1, py+1, CELL-2, CELL-2, 5);
+      ctx.fill();
+      // eyes
+      ctx.fillStyle = 'rgba(0,0,0,.35)';
+      ctx.fillRect(px + CELL*0.25, py + CELL*0.25, 3, 3);
+      ctx.fillRect(px + CELL*0.65, py + CELL*0.25, 3, 3);
+    } else {
+      ctx.fillStyle = getCSS('--snake');
+      roundedRect(ctx, px+1, py+1, CELL-2, CELL-2, 4);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function roundedRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.arcTo(x+w, y, x+w, y+h, r);
+    ctx.arcTo(x+w, y+h, x, y+h, r);
+    ctx.arcTo(x, y+h, x, y, r);
+    ctx.arcTo(x, y, x+w, y, r);
+    ctx.closePath();
+  }
+
+  function overlayText(title, subtitle) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(0,0,BOARD_PX,BOARD_PX);
+    ctx.fillStyle = getCSS('--text');
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 28px system-ui, -apple-system, Segoe UI, Roboto';
+    ctx.fillText(title, BOARD_PX/2, BOARD_PX/2 - 8);
+    ctx.font = '600 14px system-ui, -apple-system, Segoe UI, Roboto';
+    ctx.fillText(subtitle, BOARD_PX/2, BOARD_PX/2 + 16);
+    ctx.restore();
+  }
+
+  function getCSS(varName) {
+    return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  }
+
+  // start
+  init();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
