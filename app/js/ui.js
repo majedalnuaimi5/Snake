@@ -109,6 +109,7 @@
     const isTower = gameId === 'tower', mod = isTower ? G.Tower : G.Tug;
     const cfg = G.store.get('cfg:' + gameId, {});
     const st = { n: isTower ? (cfg.n || 2) : 2, names: G.store.get('names', DEF_NAMES.slice()), style: cfg.style && mod.styles[cfg.style] ? cfg.style : Object.keys(mod.styles)[0] };
+    const ALL = G.Q.categories; st.cats = (G.store.get('cats', null) || ALL).filter(c => ALL.indexOf(c) >= 0); if (!st.cats.length) st.cats = ALL.slice();
     const el = UI.mount(`<div class="screen setup">
       <header class="shead">
         <button class="btn dark sm" data-a="back">رجوع</button>
@@ -119,6 +120,8 @@
         <section class="panel">
           <div class="phead"><h2>الفرق</h2>${isTower ? `<div class="seg"><button data-n="2">فريقين</button><button data-n="3">3 فرق</button></div>` : ''}</div>
           <div class="tnames"></div>
+          <div class="phead"><h2 class="h2s">فئات الأسئلة</h2><button class="callbtn" data-a="allcats">الكل</button></div>
+          <div class="cats">${ALL.map(c => `<button class="cchip" data-cat="${esc(c)}">${esc(c)}</button>`).join('')}</div>
         </section>
         <section class="panel grow">
           <div class="phead"><h2>${isTower ? 'شكل البرج' : 'الخلفية'}</h2></div>
@@ -132,18 +135,27 @@
       el.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', +b.dataset.n === st.n));
     };
     const paintSel = () => el.querySelectorAll('.stile').forEach(b => b.classList.toggle('on', b.dataset.style === st.style));
-    paintNames(); paintSel();
+    const paintCats = () => el.querySelectorAll('.cchip').forEach(b => b.classList.toggle('on', st.cats.indexOf(b.dataset.cat) >= 0));
+    paintNames(); paintSel(); paintCats();
     el.querySelectorAll('.stile').forEach(b => { const cv = b.querySelector('canvas'); try { mod.preview(cv.getContext('2d'), b.dataset.style, cv.width, cv.height); } catch (e) { /* preview is cosmetic */ } });
     el.addEventListener('input', e => { if (e.target.dataset.i) { st.names[+e.target.dataset.i] = e.target.value; G.store.set('names', st.names); } });
     el.addEventListener('click', e => {
       const n = e.target.closest('[data-n]'), s = e.target.closest('[data-style]'), a = e.target.closest('[data-a]');
-      if (n) { S.click(); st.n = +n.dataset.n; paintNames(); }
+      const cat = e.target.closest('[data-cat]');
+      if (cat) {
+        S.click(); const c = cat.dataset.cat, i = st.cats.indexOf(c);
+        if (i < 0) st.cats.push(c); else if (st.cats.length > 1) st.cats.splice(i, 1); else UI.toast('لازم فئة وحدة على الأقل');
+        G.store.set('cats', st.cats); paintCats();
+      }
+      else if (a && a.dataset.a === 'allcats') { S.click(); st.cats = st.cats.length === ALL.length ? [ALL[0]] : ALL.slice(); G.store.set('cats', st.cats); paintCats(); }
+      else if (n) { S.click(); st.n = +n.dataset.n; paintNames(); }
       else if (s) { S.pop(); st.style = s.dataset.style; paintSel(); }
       else if (a && a.dataset.a === 'back') { S.click(); UI.home(); }
       else if (a && a.dataset.a === 'go') {
         S.good(); G.store.set('cfg:' + gameId, { n: st.n, style: st.style });
         try { if (navigator.wakeLock) navigator.wakeLock.request('screen').catch(() => { }); } catch (err) { /* optional */ }
         const teams = Array.from({ length: st.n }, (_, i) => ({ name: (st.names[i] || '').trim() || DEF_NAMES[i], color: G.TEAM_COLORS[i] }));
+        G.Q.cats = st.cats.length === ALL.length ? null : st.cats.slice();
         UI.clear(); mod.start({ teams, style: st.style });
       }
     });

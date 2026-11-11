@@ -71,17 +71,22 @@ h1,h2,p{margin:0}
 .stitle h1{font-family:var(--display);font-weight:400;font-size:92px;line-height:1;color:var(--acid);text-shadow:var(--out),0 10px 0 var(--ink)}
 .stitle p{font:700 25px/1.5 var(--body);color:var(--mute);max-width:1150px;padding-top:6px}
 .sgrid{flex:1;display:flex;gap:30px;align-items:stretch;min-height:0;padding-top:14px}
-.panel{background:var(--panel);border:5px solid var(--ink);border-radius:26px;box-shadow:0 10px 0 var(--ink);padding:22px 26px;width:440px;display:flex;flex-direction:column;gap:18px}
+.panel{background:var(--panel);border:5px solid var(--ink);border-radius:26px;box-shadow:0 10px 0 var(--ink);padding:18px 24px;width:500px;display:flex;flex-direction:column;gap:10px}
 .panel.grow{flex:1;width:auto;min-width:0}
 .phead{display:flex;justify-content:space-between;align-items:center}
 .phead h2{font-family:var(--display);font-weight:400;font-size:46px;line-height:1}
 .seg{display:flex;background:var(--ink);border-radius:14px;padding:5px;gap:5px}
 .seg button{border:0;background:transparent;color:var(--paper);font:800 24px var(--body);padding:6px 16px;border-radius:10px}
 .seg button.on{background:var(--acid);color:var(--ink)}
-.tnames{display:flex;flex-direction:column;gap:16px}
+.tnames{display:flex;flex-direction:column;gap:8px}
+.h2s{font-size:36px!important}
+.callbtn{border:4px solid var(--ink);background:var(--panel2);color:var(--paper);font:800 21px var(--body);border-radius:12px;padding:2px 16px}
+.cats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.cchip{font:800 18px/1.6 var(--body);border:3px solid var(--ink);background:var(--ink);color:var(--mute);border-radius:99px;padding:0 4px;white-space:nowrap;text-align:center}
+.cchip.on{background:var(--mint);color:var(--ink)}
 .tnames label{display:flex;align-items:center;gap:14px}
 .tnames i{width:40px;height:40px;border-radius:12px;background:var(--c);border:5px solid var(--ink);flex:none;transform:rotate(-6deg)}
-.tnames input{flex:1;min-width:0;font:800 34px var(--body);background:var(--ink);color:var(--paper);border:5px solid var(--c);border-radius:16px;padding:8px 18px;
+.tnames input{flex:1;min-width:0;font:800 28px var(--body);background:var(--ink);color:var(--paper);border:5px solid var(--c);border-radius:16px;padding:1px 16px;
   -webkit-user-select:text;user-select:text}
 .styles{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;align-content:start}
 .styles.c3{grid-template-columns:repeat(3,1fr);padding:0 40px}

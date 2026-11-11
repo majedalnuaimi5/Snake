@@ -90,9 +90,13 @@
   let used = G.store.get('usedQ', []);
   G.Q = {
     list,
+    categories: list.map(q => q.c).filter((c, i, a) => a.indexOf(c) === i),
+    cats: null, /* null = all categories, otherwise the chosen names */
     next(level) {
-      let pool = list.filter(q => q.l === level && used.indexOf(q.id) < 0);
-      if (!pool.length) { used = used.filter(id => list[id] && list[id].l !== level); pool = list.filter(q => q.l === level); }
+      const ok = q => q.l === level && (!this.cats || this.cats.indexOf(q.c) >= 0);
+      let pool = list.filter(q => ok(q) && used.indexOf(q.id) < 0);
+      if (!pool.length) { used = used.filter(id => !(list[id] && ok(list[id]))); pool = list.filter(ok); }
+      if (!pool.length) pool = list.filter(q => q.l === level);
       const q = pool[(Math.random() * pool.length) | 0];
       used.push(q.id); G.store.set('usedQ', used);
       return q;
