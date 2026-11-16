@@ -27,13 +27,14 @@
 <div id="hint" dir="rtl">اقلب الجوال بالعرض عشان تكبر الشاشة</div>
 <script src="js/matter.min.js"></script>
 <script src="js/core.js"></script>
+<script src="js/config.js"></script>
 <script src="js/questions.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/tower.js"></script>
 <script src="js/tug.js"></script>
 <script>
   document.documentElement.setAttribute('dir', 'rtl'); document.documentElement.setAttribute('lang', 'ar');
-  G.boot(); G.UI.home();
+  G.boot(); G.UI.home(); G.Q.load();
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (G.scene === G.MenuScene) { var s = document.querySelector('.setup'); if (!s) G.UI.home(); } });
 </script>
 <!--/APP-->

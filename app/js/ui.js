@@ -192,10 +192,12 @@
   const ZC = { 200: '#1FE0A8', 400: '#FFD23F', 600: '#FF2E63' };
   const QTIME = { 200: 35, 400: 40, 600: 45 };
   UI.ask = o => new Promise(res => {
-    const q = G.Q.next(o.level), total = QTIME[o.level];
-    const el = UI.mount(`<div class="ov qov"><div class="qcard" style="--zc:${ZC[o.level]};--c:${o.color}">
+    const q = G.Q.next(o.level), total = QTIME[o.level] + (q.m && q.m.type !== 'image' ? 20 : 0);
+    const media = m => !m || !m.url ? '' : m.type === 'video' ? `<video class="qmedia" src="${esc(m.url)}" controls playsinline preload="auto"></video>` : m.type === 'audio' ? `<audio class="qaudio" src="${esc(m.url)}" controls preload="auto"></audio>` : `<img class="qmedia" src="${esc(m.url)}" alt="">`;
+    const el = UI.mount(`<div class="ov qov"><div class="qcard ${q.m || q.am ? 'hasmedia' : ''}" style="--zc:${ZC[o.level]};--c:${o.color}">
       <div class="pts">${o.level}</div><div class="cat">${esc(q.c)}</div>
       <div class="qwho">سؤال <b>${esc(o.team)}</b>${o.note ? ' · ' + esc(o.note) : ''}</div>
+      <div class="qmwrap">${media(q.m)}</div>
       <div class="qtext">${esc(q.q)}</div>
       <div class="qans" hidden><small>الجواب</small>${esc(q.a)}</div>
       <div class="tbar"><i></i><span>${total}</span></div>
@@ -214,6 +216,8 @@
     function reveal(timeout) {
       if (revealed) return; revealed = true; clearInterval(iv); S.pop();
       el.querySelector('.qans').hidden = false; el.querySelector('.tbar').hidden = true;
+      const mw = el.querySelector('.qmwrap'), pl = mw.querySelector('video,audio');
+      if (q.am && q.am.url) mw.innerHTML = media(q.am); else if (pl) pl.pause();
       if (timeout) el.querySelector('.qwho').innerHTML = '<b>خلص الوقت!</b>';
       el.querySelector('.qbtns').innerHTML = '<button class="btn mint" data-a="yes">جاوبوا صح</button><button class="btn hot" data-a="no">جاوبوا غلط</button>';
     }

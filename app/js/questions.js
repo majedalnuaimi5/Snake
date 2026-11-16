@@ -86,20 +86,36 @@
     [600, 'كرة قدم', 'من حارس المرمى الوحيد الذي فاز بالكرة الذهبية؟', 'ليف ياشين'],
     [600, 'كرة قدم', 'من سجّل أسرع هدف في تاريخ كأس العالم؟', 'هاكان شوكور (بعد 11 ثانية)']
   ];
-  const list = L.map((r, i) => ({ id: i, l: r[0], c: r[1], q: r[2], a: r[3] }));
-  let used = G.store.get('usedQ', []);
-  G.Q = {
-    list,
-    categories: list.map(q => q.c).filter((c, i, a) => a.indexOf(c) === i),
-    cats: null, /* null = all categories, otherwise the chosen names */
+  const builtin = L.map((r, i) => ({ id: 'b' + i, l: r[0], c: r[1], q: r[2], a: r[3] }));
+  const fromRow = r => ({
+    id: r.id, l: r.level, c: r.category, q: r.question, a: r.answer,
+    m: r.media_url ? { url: r.media_url, type: r.media_type || 'image' } : null,
+    am: r.answer_media_url ? { url: r.answer_media_url, type: r.answer_media_type || 'image' } : null
+  });
+  let list = builtin, used = (G.store.get('usedQ', []) || []).map(String);
+  const Q = G.Q = {
+    builtin, source: 'builtin', cats: null, /* cats: null = all categories, otherwise the chosen names */
+    get list() { return list; },
+    get categories() { return list.map(q => q.c).filter((c, i, a) => a.indexOf(c) === i); },
+    use(rows) { if (rows && rows.length) { list = rows.map(fromRow); Q.source = 'remote'; } else { list = builtin; Q.source = 'builtin'; } },
+    /* pull the question bank from Supabase; keeps the last good copy for offline play */
+    load() {
+      const cfg = window.GJ_CFG; if (!cfg || !cfg.url || !window.fetch) return Promise.resolve(false);
+      return fetch(cfg.url + '/rest/v1/questions?select=*&active=eq.true&limit=5000', { headers: { apikey: cfg.key, Authorization: 'Bearer ' + cfg.key } })
+        .then(r => r.ok ? r.json() : Promise.reject(r.status))
+        .then(rows => { G.store.set('remoteQ', rows); Q.use(rows); return true; })
+        .catch(() => false);
+    },
     next(level) {
-      const ok = q => q.l === level && (!this.cats || this.cats.indexOf(q.c) >= 0);
-      let pool = list.filter(q => ok(q) && used.indexOf(q.id) < 0);
-      if (!pool.length) { used = used.filter(id => !(list[id] && ok(list[id]))); pool = list.filter(ok); }
+      const ok = q => q.l === level && (!Q.cats || Q.cats.indexOf(q.c) >= 0);
+      let pool = list.filter(q => ok(q) && used.indexOf(String(q.id)) < 0);
+      if (!pool.length) { const ids = list.filter(ok).map(q => String(q.id)); used = used.filter(id => ids.indexOf(id) < 0); pool = list.filter(ok); }
       if (!pool.length) pool = list.filter(q => q.l === level);
+      if (!pool.length) pool = builtin.filter(q => q.l === level);
       const q = pool[(Math.random() * pool.length) | 0];
-      used.push(q.id); G.store.set('usedQ', used);
+      used.push(String(q.id)); if (used.length > 4000) used = used.slice(-2000); G.store.set('usedQ', used);
       return q;
     }
   };
+  Q.use(G.store.get('remoteQ', null));
 })();
